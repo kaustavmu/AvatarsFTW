@@ -1,0 +1,15 @@
+PyOpenGL==3.1.6
+omegaconf==2.0.2
+pytorch-lightning==1.5.1
+kornia==0.6.3
+roma
+trimesh
+toolz
+tablib
+opencv-python
+scikit-learn
+pyrender>=0.1.45
+smplx>=0.1.21
+torchserve==0.5.3
+rich==10.16.1
+boto3==1.24.94

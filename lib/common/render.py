@@ -396,3 +396,20 @@ class Render:
                 images.append(rendered_img)
 
         return images
+    
+    def compute_distance_map(self, input_tensor):
+        """
+        Input tensor shape = [H,W]
+        """
+        import kornia
+        input_tensor = input_tensor.unsqueeze(0).unsqueeze(0)
+        input_tensor = (input_tensor>0).float()
+        distance_map = kornia.contrib.distance_transform(input_tensor)
+        return distance_map[0][0]
+    
+    def sobel(self, input_tensor):
+        import kornia
+        input_tensor = input_tensor.unsqueeze(0).unsqueeze(0)
+        input_tensor = (input_tensor>0).float()
+        sobel = kornia.filters.sobel(input_tensor)
+        return sobel[0][0]

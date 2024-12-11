@@ -1,0 +1,101 @@
+context:
+  # force_cpu: true
+  # gpu: 0
+  type: shopper
+body:
+  data_root: ${env:SMPL_ROOT}
+  num_betas: 300
+  gender: neutral
+  virtual_joints:
+    neck_uv: ${env:KLOTHED_SHOPPER_VJ_NECK}
+    pelvis_uv: ${env:KLOTHED_SHOPPER_VJ_PELVIS}
+    shoulder_uv:
+      neck: ${env:KLOTHED_SHOPPER_VJ_SHOULDER_NECK}
+      clavicle: ${env:KLOTHED_SHOPPER_VJ_SHOULDER_CLAV}
+    hip_uv:
+      hip: ${env:KLOTHED_SHOPPER_VJ_HIP_CREST}
+      pelvis: ${env:KLOTHED_SHOPPER_VJ_HIP_PELVIS}
+objective:
+  hole_w: 10.0
+  tol_e: 1e-12
+  tol_g: 1e-9
+  process:
+    stage1:
+      iterations: 5
+      parameters:
+        # pose: [expression_t, global_orient_t, translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+        pose: [translation_t, global_orient_t, pose_t, lhand_t, rhand_t]
+        shape: [0, 5]
+      weights:        
+        data_body: 1.0
+        data_hands: 0.0
+        data_face: 0.0
+        prior_shape: 500.0
+        prior_expression: 0.0
+        prior_pose: 400.0
+        prior_hinge: 228.6
+    # stage1b:
+    #   iterations: 5
+    #   parameters:
+    #     # pose: [expression_t, global_orient_t, translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+    #     pose: [expression_t, translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+    #     shape: [1, 5]
+    #   weights:        
+    #     data_body: 1.0
+    #     data_hands: 0.0
+    #     data_face: 0.0
+    #     prior_shape: 500.0
+    #     prior_expression: 0.0
+    #     prior_pose: 400.0
+    #     prior_hinge: 228.6 
+    stage2:
+      iterations: 5
+      parameters:
+        # pose: [expression_t, translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+        pose: [translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+        shape: [1, 5]
+      weights:
+        data_body: 1.0
+        data_hands: 0.5
+        data_face: 0.5
+        prior_shape: 500.0
+        prior_expression: 500.0
+        prior_pose: 250.0
+        prior_hinge: 0.0
+    stage3:
+      disentangled: true
+      iterations: 10
+      parameters:
+        # pose: [expression_t, global_orient_t, translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+        pose: [translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+        shape: [1, 5]
+      weights:
+        data_body: 1.0
+        data_hands: 2.0 # 2.0
+        data_face: 2.0 # 2.0
+        prior_shape: 500.0
+        prior_expression: 500.0
+        prior_pose: 250.0
+        prior_hinge: 0.0
+        data_edt: 10.0
+        data_edt_holes: 10.0
+        data_mask: 15.0
+        data_mask_holes: 15.0
+    stage4:
+      iterations: 15
+      parameters:
+        # pose: [expression_t, global_orient_t, translation_t, pose_t, jaw_t, lhand_t, rhand_t]
+        pose: [pose_t, jaw_t, lhand_t, rhand_t]
+        shape: [2, 20]
+      weights:
+        data_body: 1.0
+        data_hands: 2.0
+        data_face: 2.0
+        prior_shape: 150.0
+        prior_expression: 50.0
+        prior_pose: 200.0
+        prior_hinge: 0.0
+        data_edt: 2.0
+        data_mask: 1.0
+        data_edt_holes: 2.0
+        data_mask_holes: 1.0

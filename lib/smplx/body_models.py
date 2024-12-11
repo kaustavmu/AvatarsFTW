@@ -18,7 +18,7 @@ from typing import Optional, Dict, Union
 import os
 import os.path as osp
 import pickle
-
+import pdb
 import numpy as np
 import torch
 import torch.nn as nn
@@ -1213,11 +1213,12 @@ class SMPLX(SMPLH):
                 transl = self.transl
 
         if self.use_pca:
+            # breakpoint()
             left_hand_pose = torch.einsum(
                 'bi,ij->bj', [left_hand_pose, self.left_hand_components])
             right_hand_pose = torch.einsum(
                 'bi,ij->bj', [right_hand_pose, self.right_hand_components])
-
+        breakpoint()
         full_pose = torch.cat([
             global_orient, body_pose, jaw_pose, leye_pose, reye_pose,
             left_hand_pose, right_hand_pose

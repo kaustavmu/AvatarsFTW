@@ -14,13 +14,17 @@ import logging
 import torch
 import torch.nn as nn
 
+
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
 
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=3, stride=stride,
+        padding=1, bias=False
+    )
 
 
 class BasicBlock(nn.Module):
@@ -62,10 +66,13 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
+                               padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(planes * self.expansion, momentum=BN_MOMENTUM)
+        self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1,
+                               bias=False)
+        self.bn3 = nn.BatchNorm2d(planes * self.expansion,
+                                  momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -94,6 +101,7 @@ class Bottleneck(nn.Module):
 
 
 class PoseResNet(nn.Module):
+
     def __init__(self, block, layers, cfg, global_mode, **kwargs):
         self.inplanes = 64
         extra = cfg.POSE_RES_MODEL.EXTRA
@@ -101,7 +109,8 @@ class PoseResNet(nn.Module):
         self.deconv_with_bias = extra.DECONV_WITH_BIAS
 
         super(PoseResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
         self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -135,13 +144,8 @@ class PoseResNet(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(
-                    self.inplanes,
-                    planes * block.expansion,
-                    kernel_size=1,
-                    stride=stride,
-                    bias=False
-                ),
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
             )
 
@@ -186,9 +190,7 @@ class PoseResNet(nn.Module):
                     stride=2,
                     padding=padding,
                     output_padding=output_padding,
-                    bias=self.deconv_with_bias
-                )
-            )
+                    bias=self.deconv_with_bias))
             layers.append(nn.BatchNorm2d(planes, momentum=BN_MOMENTUM))
             layers.append(nn.ReLU(inplace=True))
             self.inplanes = planes
@@ -216,9 +218,7 @@ class PoseResNet(nn.Module):
         else:
             g_feat = None
             if self.extra.NUM_DECONV_LAYERS == 3:
-                deconv_blocks = [
-                    self.deconv_layers[0:3], self.deconv_layers[3:6], self.deconv_layers[6:9]
-                ]
+                deconv_blocks = [self.deconv_layers[0:3], self.deconv_layers[3:6], self.deconv_layers[6:9]]
 
             s_feat_list = []
             s_feat = x
@@ -284,15 +284,14 @@ resnet_spec = {
     152: (Bottleneck, [3, 8, 36, 3])
 }
 
-
-def get_resnet_encoder(cfg, init_weight=True, global_mode=False, **kwargs):
+def get_resnet_encoder(cfg, is_train=True, global_mode=False, **kwargs):
     num_layers = cfg.POSE_RES_MODEL.EXTRA.NUM_LAYERS
 
     block_class, layers = resnet_spec[num_layers]
 
     model = PoseResNet(block_class, layers, cfg, global_mode, **kwargs)
 
-    if init_weight:
+    if is_train and cfg.POSE_RES_MODEL.INIT_WEIGHTS:
         if num_layers == 50:
             if cfg.POSE_RES_MODEL.PRETR_SET in ['imagenet']:
                 model.init_weights(cfg.POSE_RES_MODEL.PRETRAINED_IM)

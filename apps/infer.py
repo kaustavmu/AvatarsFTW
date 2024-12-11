@@ -16,7 +16,7 @@
 
 import warnings
 import logging
-
+import pdb
 warnings.filterwarnings("ignore")
 logging.getLogger("lightning").setLevel(logging.ERROR)
 logging.getLogger("trimesh").setLevel(logging.ERROR)
@@ -136,7 +136,11 @@ if __name__ == "__main__":
 
     # cfg read and merge
     cfg.merge_from_file(args.config)
-    cfg.merge_from_file("./lib/pymaf/configs/pymaf_config.yaml")
+
+    if args.hps_type == 'pymafx':
+        cfg.merge_from_file("./lib/pymafx/configs/pymafx_config.yaml")
+    else:
+        cfg.merge_from_file("./lib/pymaf/configs/pymaf_config.yaml")
 
     cfg_show_list = [
         "test_gpus", [args.gpu_device], "mcube_res", 256, "clean_mesh", True,
@@ -170,11 +174,9 @@ if __name__ == "__main__":
     dataset = TestDataset(dataset_param, device)
 
     print(colored(f"Dataset Size: {len(dataset)}", "green"))
-
     pbar = tqdm(dataset)
-
     for data in pbar:
-
+        print("STARTING OUTER LOOP")
         pbar.set_description(f"{data['name']}")
 
         in_tensor = {"smpl_faces": data["smpl_faces"], "image": data["image"]}
@@ -243,12 +245,12 @@ if __name__ == "__main__":
         }
 
         # smpl optimization
-
+        print("HELLO WE")
         loop_smpl = tqdm(
             range(args.loop_smpl if cfg.net.prior_type != "pifu" else 1))
 
         per_data_lst = []
-
+        # breakpoint()
         for i in loop_smpl:
 
             per_loop_lst = []
@@ -261,7 +263,7 @@ if __name__ == "__main__":
             optimed_pose_mat = rot6d_to_rotmat(optimed_pose.view(
                 -1, 6)).unsqueeze(0)
 
-            if dataset_param["hps_type"] != "pixie":
+            if dataset_param["hps_type"] not in ["pixie","pymafx"]:
                 smpl_out = dataset.smpl_model(
                     betas=optimed_betas,
                     body_pose=optimed_pose_mat,
@@ -272,7 +274,36 @@ if __name__ == "__main__":
 
                 smpl_verts = smpl_out.vertices * data["scale"]       # 这里乘了一个scale
                 smpl_joints = smpl_out.joints * data["scale"]
+            elif dataset_param['hps_type'] == "pymafx":
+                # breakpoint()
+                # smpl_out = dataset.smpl_model(
+                #     shape_params=optimed_betas,
+                #     expression_params=tensor2variable(data["exp"], device),
+                #     body_pose=optimed_pose_mat,
+                #     global_pose=optimed_orient_mat,
+                #     jaw_pose=tensor2variable(data["jaw_pose"], device),
+                #     left_hand_pose=tensor2variable(data["left_hand_pose"],
+                #                                    device),
+                #     right_hand_pose=tensor2variable(data["right_hand_pose"],
+                #                                     device),
+                # )
+                smpl_out = dataset.smpl_model(
+                    shape_params=optimed_betas,
+                    betas=optimed_betas,
+                    body_pose=optimed_pose_mat,
+                    global_orient=optimed_orient_mat,
+                    transl=optimed_trans,
+                    pose2rot=False,
+                    left_hand_pose=tensor2variable(data["left_hand_pose"],
+                                                   device),
+                    right_hand_pose=tensor2variable(data["right_hand_pose"],
+                                                    device),
+                )
+                smpl_verts = smpl_out.vertices * data["scale"]       # 这里乘了一个scale
+                smpl_joints = smpl_out.joints * data["scale"]
             else:
+                print("HELOOOO WERE PIXIE BOYS")
+                # breakpoint()
                 smpl_verts, smpl_landmarks, smpl_joints = dataset.smpl_model(
                     shape_params=optimed_betas,
                     expression_params=tensor2variable(data["exp"], device),
@@ -289,9 +320,12 @@ if __name__ == "__main__":
                 smpl_joints = (smpl_joints + optimed_trans) * data["scale"]
 
             smpl_joints *= torch.tensor([1.0, 1.0, -1.0]).to(device)
-
-            if data["type"] == "smpl":
+            # breakpoint()
+            if data["type"] == "smpl" and dataset_param['hps_type'] != "pymafx":
                 in_tensor["smpl_joint"] = smpl_joints[:, :24, :]
+
+            elif dataset_param['hps_type'] == 'pymafx':
+                in_tensor["smpl_joint"] = smpl_joints[:, dataset.smpl_joint_ids_24, :]
             elif data["type"] == "smplx" and dataset_param[
                     "hps_type"] != "pixie":
                 in_tensor["smpl_joint"] = smpl_joints[:, dataset.
@@ -302,6 +336,7 @@ if __name__ == "__main__":
                                                 smpl_joint_ids_24_pixie, :]
 
             # render optimized mesh (normal, T_normal, image [-1,1])
+            # breakpoint()
             in_tensor["T_normal_F"], in_tensor[
                 "T_normal_B"] = dataset.render_normal(
                     smpl_verts * torch.tensor([1.0, -1.0, -1.0]).to(device),
@@ -345,6 +380,23 @@ if __name__ == "__main__":
             gt_arr = ((gt_arr - bg_color).sum(dim=-1) != 0.0).float()
             diff_S = torch.abs(smpl_arr - gt_arr)
             losses["silhouette"]["value"] = diff_S.mean()
+            print(losses['silhouette']['value'])
+
+
+            # implement sobel and sobel loss as shown in K-Body
+            # distance map loss
+            gt_distance = dataset.render.compute_distance_map(gt_arr[:,:512])
+            smpl_distance = dataset.render.compute_distance_map(smpl_arr[:,:512])
+            diff_dist = torch.abs(smpl_distance - gt_distance)
+            print("Distance Loss:",diff_dist)
+            losses["silhouette"]["value"] += 0.1*diff_dist.mean()
+
+            # sobel loss
+            gt_s = dataset.render.sobel(gt_arr[:,:512])
+            smpl_s = dataset.render.sobel(smpl_arr[:,:512])
+            diff_s = torch.abs(smpl_distance - gt_distance)
+            losses["silhouette"]["value"] += 0.1*diff_s.mean()
+            print("Sobel Loss:",diff_dist)
 
             # Weighted sum of the losses
             smpl_loss = 0.0
@@ -472,250 +524,250 @@ if __name__ == "__main__":
         face_mesh=smpl_obj.copy()
         # ------------------------------------------------------------------------------------------------------------------
         
+        # break
+        # # cloth optimization
 
-        # cloth optimization
+        # per_data_lst = []
 
-        per_data_lst = []
+        # # cloth recon
+        # in_tensor.update(
+        #     dataset.compute_vis_cmap(in_tensor["smpl_verts"][0],
+        #                              in_tensor["smpl_faces"][0]))
 
-        # cloth recon
-        in_tensor.update(
-            dataset.compute_vis_cmap(in_tensor["smpl_verts"][0],
-                                     in_tensor["smpl_faces"][0]))
+        # in_tensor.update({
+        #     "smpl_norm":
+        #     compute_normal_batch(in_tensor["smpl_verts"],
+        #                          in_tensor["smpl_faces"])
+        # })
 
-        in_tensor.update({
-            "smpl_norm":
-            compute_normal_batch(in_tensor["smpl_verts"],
-                                 in_tensor["smpl_faces"])
-        })
-
-        if cfg.net.prior_type == "pamir":
-            in_tensor.update(
-                dataset.compute_voxel_verts(
-                    optimed_pose,
-                    optimed_orient,
-                    optimed_betas,
-                    optimed_trans,
-                    data["scale"],
-                ))
+        # if cfg.net.prior_type == "pamir":
+        #     in_tensor.update(
+        #         dataset.compute_voxel_verts(
+        #             optimed_pose,
+        #             optimed_orient,
+        #             optimed_betas,
+        #             optimed_trans,
+        #             data["scale"],
+        #         ))
             
 
 
-        with torch.no_grad():
-            verts_pr, faces_pr, _ = model.test_single(in_tensor)
+        # with torch.no_grad():
+        #     verts_pr, faces_pr, _ = model.test_single(in_tensor)
 
-        recon_obj = trimesh.Trimesh(verts_pr,
-                                    faces_pr,
-                                    process=False,
-                                    maintains_order=True)
-        recon_obj.export(
-            os.path.join(args.out_dir, cfg.name,
-                         f"obj/{data['name']}_recon.obj"))
+        # recon_obj = trimesh.Trimesh(verts_pr,
+        #                             faces_pr,
+        #                             process=False,
+        #                             maintains_order=True)
+        # recon_obj.export(
+        #     os.path.join(args.out_dir, cfg.name,
+        #                  f"obj/{data['name']}_recon.obj"))
 
-        # Isotropic Explicit Remeshing for better geometry topology
-        verts_refine, faces_refine = remesh(
-            os.path.join(args.out_dir, cfg.name,
-                         f"obj/{data['name']}_recon.obj"), 0.5, device)
+        # # Isotropic Explicit Remeshing for better geometry topology
+        # verts_refine, faces_refine = remesh(
+        #     os.path.join(args.out_dir, cfg.name,
+        #                  f"obj/{data['name']}_recon.obj"), 0.5, device)
 
-        # define local_affine deform verts
-        mesh_pr = Meshes(verts_refine, faces_refine).to(device)
-        local_affine_model = LocalAffine(mesh_pr.verts_padded().shape[1],
-                                         mesh_pr.verts_padded().shape[0],
-                                         mesh_pr.edges_packed()).to(device)
-        optimizer_cloth = torch.optim.Adam(
-            [{
-                'params': local_affine_model.parameters()
-            }],
-            lr=1e-4,
-            amsgrad=True)
+        # # define local_affine deform verts
+        # mesh_pr = Meshes(verts_refine, faces_refine).to(device)
+        # local_affine_model = LocalAffine(mesh_pr.verts_padded().shape[1],
+        #                                  mesh_pr.verts_padded().shape[0],
+        #                                  mesh_pr.edges_packed()).to(device)
+        # optimizer_cloth = torch.optim.Adam(
+        #     [{
+        #         'params': local_affine_model.parameters()
+        #     }],
+        #     lr=1e-4,
+        #     amsgrad=True)
 
-        scheduler_cloth = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer_cloth,
-            mode="min",
-            factor=0.1,
-            verbose=0,
-            min_lr=1e-5,
-            patience=args.patience,
-        )
+        # scheduler_cloth = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        #     optimizer_cloth,
+        #     mode="min",
+        #     factor=0.1,
+        #     verbose=0,
+        #     min_lr=1e-5,
+        #     patience=args.patience,
+        # )
 
-        with torch.no_grad():
-            per_loop_lst = []
-            rotate_recon_lst = dataset.render.get_rgb_image(
-                cam_ids=[0, 1, 2, 3])
-            per_loop_lst.extend(rotate_recon_lst)
-            per_data_lst.append(
-                get_optim_grid_image(per_loop_lst, None, type="cloth"))
+        # with torch.no_grad():
+        #     per_loop_lst = []
+        #     rotate_recon_lst = dataset.render.get_rgb_image(
+        #         cam_ids=[0, 1, 2, 3])
+        #     per_loop_lst.extend(rotate_recon_lst)
+        #     per_data_lst.append(
+        #         get_optim_grid_image(per_loop_lst, None, type="cloth"))
 
-        final = None
+        # final = None
 
-        if args.loop_cloth > 0:
+        # if args.loop_cloth > 0:
 
-            loop_cloth = tqdm(range(args.loop_cloth))
+        #     loop_cloth = tqdm(range(args.loop_cloth))
 
-            for i in loop_cloth:
+        #     for i in loop_cloth:
 
-                per_loop_lst = []
+        #         per_loop_lst = []
 
-                optimizer_cloth.zero_grad()
+        #         optimizer_cloth.zero_grad()
 
-                deformed_verts, stiffness, rigid = local_affine_model(
-                    verts_refine.to(device), return_stiff=True)
-                mesh_pr = mesh_pr.update_padded(deformed_verts)
+        #         deformed_verts, stiffness, rigid = local_affine_model(
+        #             verts_refine.to(device), return_stiff=True)
+        #         mesh_pr = mesh_pr.update_padded(deformed_verts)
 
-                # losses for laplacian, edge, normal consistency
-                update_mesh_shape_prior_losses(mesh_pr, losses)
+        #         # losses for laplacian, edge, normal consistency
+        #         update_mesh_shape_prior_losses(mesh_pr, losses)
 
-                in_tensor["P_normal_F"], in_tensor[
-                    "P_normal_B"] = dataset.render_normal(
-                        mesh_pr.verts_padded(), mesh_pr.faces_padded())
+        #         in_tensor["P_normal_F"], in_tensor[
+        #             "P_normal_B"] = dataset.render_normal(
+        #                 mesh_pr.verts_padded(), mesh_pr.faces_padded())
 
-                diff_F_cloth = torch.abs(in_tensor["P_normal_F"] -
-                                         in_tensor["normal_F"])
-                diff_B_cloth = torch.abs(in_tensor["P_normal_B"] -
-                                         in_tensor["normal_B"])
+        #         diff_F_cloth = torch.abs(in_tensor["P_normal_F"] -
+        #                                  in_tensor["normal_F"])
+        #         diff_B_cloth = torch.abs(in_tensor["P_normal_B"] -
+        #                                  in_tensor["normal_B"])
 
-                losses["cloth"]["value"] = (diff_F_cloth + diff_B_cloth).mean()
-                losses["stiffness"]["value"] = torch.mean(stiffness)
-                losses["rigid"]["value"] = torch.mean(rigid)
+        #         losses["cloth"]["value"] = (diff_F_cloth + diff_B_cloth).mean()
+        #         losses["stiffness"]["value"] = torch.mean(stiffness)
+        #         losses["rigid"]["value"] = torch.mean(rigid)
 
-                # Weighted sum of the losses
-                cloth_loss = torch.tensor(0.0, requires_grad=True).to(device)
-                pbar_desc = "Cloth Refinement --- "
+        #         # Weighted sum of the losses
+        #         cloth_loss = torch.tensor(0.0, requires_grad=True).to(device)
+        #         pbar_desc = "Cloth Refinement --- "
 
-                for k in losses.keys():
-                    if k not in ["normal", "silhouette"
-                                 ] and losses[k]["weight"] > 0.0:
-                        cloth_loss = cloth_loss + \
-                            losses[k]["value"] * losses[k]["weight"]
-                        pbar_desc += f"{k}:{losses[k]['value']* losses[k]['weight']:.5f} | "
+        #         for k in losses.keys():
+        #             if k not in ["normal", "silhouette"
+        #                          ] and losses[k]["weight"] > 0.0:
+        #                 cloth_loss = cloth_loss + \
+        #                     losses[k]["value"] * losses[k]["weight"]
+        #                 pbar_desc += f"{k}:{losses[k]['value']* losses[k]['weight']:.5f} | "
 
-                pbar_desc += f"Total: {cloth_loss:.5f}"
-                loop_cloth.set_description(pbar_desc)
+        #         pbar_desc += f"Total: {cloth_loss:.5f}"
+        #         loop_cloth.set_description(pbar_desc)
 
-                # update params
-                cloth_loss.backward(retain_graph=True)
-                optimizer_cloth.step()
-                scheduler_cloth.step(cloth_loss)
+        #         # update params
+        #         cloth_loss.backward(retain_graph=True)
+        #         optimizer_cloth.step()
+        #         scheduler_cloth.step(cloth_loss)
 
-                # for vis
-                with torch.no_grad():
-                    if i % args.vis_freq == 0:
+        #         # for vis
+        #         with torch.no_grad():
+        #             if i % args.vis_freq == 0:
 
-                        rotate_recon_lst = dataset.render.get_rgb_image(
-                            cam_ids=[0, 1, 2, 3])
+        #                 rotate_recon_lst = dataset.render.get_rgb_image(
+        #                     cam_ids=[0, 1, 2, 3])
 
-                        per_loop_lst.extend([
-                            in_tensor["image"],
-                            in_tensor["P_normal_F"],
-                            in_tensor["normal_F"],
-                            diff_F_cloth / 2.0,
-                        ])
-                        per_loop_lst.extend([
-                            in_tensor["image"],
-                            in_tensor["P_normal_B"],
-                            in_tensor["normal_B"],
-                            diff_B_cloth / 2.0,
-                        ])
-                        per_loop_lst.extend(rotate_recon_lst)
-                        per_data_lst.append(
-                            get_optim_grid_image(per_loop_lst,
-                                                 None,
-                                                 type="cloth"))
+        #                 per_loop_lst.extend([
+        #                     in_tensor["image"],
+        #                     in_tensor["P_normal_F"],
+        #                     in_tensor["normal_F"],
+        #                     diff_F_cloth / 2.0,
+        #                 ])
+        #                 per_loop_lst.extend([
+        #                     in_tensor["image"],
+        #                     in_tensor["P_normal_B"],
+        #                     in_tensor["normal_B"],
+        #                     diff_B_cloth / 2.0,
+        #                 ])
+        #                 per_loop_lst.extend(rotate_recon_lst)
+        #                 per_data_lst.append(
+        #                     get_optim_grid_image(per_loop_lst,
+        #                                          None,
+        #                                          type="cloth"))
                         
            
-            per_data_lst[1].save(
-                os.path.join(args.out_dir, cfg.name,
-                             f"refinement/{data['name']}_cloth.gif"),
-                save_all=True,
-                append_images=per_data_lst[2:],
-                duration=500,
-                loop=0,
-            )
+        #     per_data_lst[1].save(
+        #         os.path.join(args.out_dir, cfg.name,
+        #                      f"refinement/{data['name']}_cloth.gif"),
+        #         save_all=True,
+        #         append_images=per_data_lst[2:],
+        #         duration=500,
+        #         loop=0,
+        #     )
 
-            if args.vis_freq == 1:
-                image2vid(
-                    per_data_lst,
-                    os.path.join(args.out_dir, cfg.name,
-                                 f"refinement/{data['name']}_cloth.avi"),
-                )
+        #     if args.vis_freq == 1:
+        #         image2vid(
+        #             per_data_lst,
+        #             os.path.join(args.out_dir, cfg.name,
+        #                          f"refinement/{data['name']}_cloth.avi"),
+        #         )
 
-            final = trimesh.Trimesh(
-                mesh_pr.verts_packed().detach().squeeze(0).cpu(),
-                mesh_pr.faces_packed().detach().squeeze(0).cpu(),
-                process=False,
-                maintains_order=True)
+        #     final = trimesh.Trimesh(
+        #         mesh_pr.verts_packed().detach().squeeze(0).cpu(),
+        #         mesh_pr.faces_packed().detach().squeeze(0).cpu(),
+        #         process=False,
+        #         maintains_order=True)
             
-            ### add hands
-            full_lst=[]
-            if "face" in [""]:
+        #     ### add hands
+        #     full_lst=[]
+        #     if "face" in [""]:
 
-                # only face
-                face_mesh = apply_vertex_mask(face_mesh, SMPLX_object.front_flame_vertex_mask)
-                face_mesh.vertices = face_mesh.vertices - np.array([0, 0, 0.02])
+        #         # only face
+        #         face_mesh = apply_vertex_mask(face_mesh, SMPLX_object.front_flame_vertex_mask)
+        #         face_mesh.vertices = face_mesh.vertices - np.array([0, 0, 0.02])
 
-                # remove face neighbor triangles
-                final = part_removal(
-                    final,
-                    face_mesh,
-                    0.06,
-                    device,
-                    smplx_mesh,
-                    region="face"
-                )
+        #         # remove face neighbor triangles
+        #         final = part_removal(
+        #             final,
+        #             face_mesh,
+        #             0.06,
+        #             device,
+        #             smplx_mesh,
+        #             region="face"
+        #         )
                
-                face_mesh.export(f"{args.out_dir}/{cfg.name}/obj/{data['name']}_face.obj")
-                full_lst += [face_mesh]
+        #         face_mesh.export(f"{args.out_dir}/{cfg.name}/obj/{data['name']}_face.obj")
+        #         full_lst += [face_mesh]
 
-            # change hands to smplx
-            if True in data['hands_visibility'][0]:
-                hand_mask = torch.zeros(SMPLX_object.smplx_verts.shape[0], )
-                if data['hands_visibility'][0][0]:
-                    hand_mask.index_fill_(
-                        0, torch.tensor(SMPLX_object.smplx_mano_vid_dict["left_hand"]), 1.0
-                    )
-                if data['hands_visibility'][0][1]:
-                    hand_mask.index_fill_(
-                        0, torch.tensor(SMPLX_object.smplx_mano_vid_dict["right_hand"]), 1.0
-                    )
+        #     # change hands to smplx
+        #     if True in data['hands_visibility'][0]:
+        #         hand_mask = torch.zeros(SMPLX_object.smplx_verts.shape[0], )
+        #         if data['hands_visibility'][0][0]:
+        #             hand_mask.index_fill_(
+        #                 0, torch.tensor(SMPLX_object.smplx_mano_vid_dict["left_hand"]), 1.0
+        #             )
+        #         if data['hands_visibility'][0][1]:
+        #             hand_mask.index_fill_(
+        #                 0, torch.tensor(SMPLX_object.smplx_mano_vid_dict["right_hand"]), 1.0
+        #             )
 
-                # only hands
+        #         # only hands
                 
-                hand_mesh = apply_vertex_mask(hand_mesh, hand_mask)
+        #         hand_mesh = apply_vertex_mask(hand_mesh, hand_mask)
 
-                final=part_removal(
-                    final,
-                    hand_mesh,
-                    0.08,
-                    device,
-                    smplx_mesh,
-                    region="hand"
-                )
-                hand_mesh.export(f"{args.out_dir}/{cfg.name}/obj/{data['name']}_hand.obj")
-                full_lst+=[hand_mesh]
-                full_lst+=[final]
+        #         final=part_removal(
+        #             final,
+        #             hand_mesh,
+        #             0.08,
+        #             device,
+        #             smplx_mesh,
+        #             region="hand"
+        #         )
+        #         hand_mesh.export(f"{args.out_dir}/{cfg.name}/obj/{data['name']}_hand.obj")
+        #         full_lst+=[hand_mesh]
+        #         full_lst+=[final]
 
-                final = poisson(
-                    sum(full_lst),
-                    f"{args.out_dir}/{cfg.name}/obj/{data['name']}_refine.obj",
-                    10,
-                )
+        #         final = poisson(
+        #             sum(full_lst),
+        #             f"{args.out_dir}/{cfg.name}/obj/{data['name']}_refine.obj",
+        #             10,
+        #         )
 
 
 
            
-            # in_tensor.pop("animated_smpl_verts")
-            verts_pr=torch.FloatTensor(final.vertices).to(device)
-            face_pr=torch.FloatTensor(final.faces).to(device)
-            # final_colors=gen_mesh_color(verts_pr, model.netG, device, in_tensor)
-            # final_colors = query_color(
-            #     verts_pr.detach().squeeze(0).cpu(),
-            #     face_pr.detach().squeeze(0).cpu(),
-            #     in_tensor["image"],
-            #     device=device,
-            #     predicted_color=torch.FloatTensor(final_colors)
-            # )
-            # final.visual.vertex_colors = final_colors
-            final.export(
-                f"{args.out_dir}/{cfg.name}/obj/{data['name']}_refine.obj")
+        #     # in_tensor.pop("animated_smpl_verts")
+        #     verts_pr=torch.FloatTensor(final.vertices).to(device)
+        #     face_pr=torch.FloatTensor(final.faces).to(device)
+        #     # final_colors=gen_mesh_color(verts_pr, model.netG, device, in_tensor)
+        #     # final_colors = query_color(
+        #     #     verts_pr.detach().squeeze(0).cpu(),
+        #     #     face_pr.detach().squeeze(0).cpu(),
+        #     #     in_tensor["image"],
+        #     #     device=device,
+        #     #     predicted_color=torch.FloatTensor(final_colors)
+        #     # )
+        #     # final.visual.vertex_colors = final_colors
+        #     final.export(
+        #         f"{args.out_dir}/{cfg.name}/obj/{data['name']}_refine.obj")
             
 
            

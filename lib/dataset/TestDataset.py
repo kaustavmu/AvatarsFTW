@@ -13,17 +13,19 @@
 # for Intelligent Systems. All rights reserved.
 #
 # Contact: ps-license@tuebingen.mpg.de
-
+import pdb
 from lib.hybrik.models.simple3dpose import HybrIKBaseSMPLCam
 from lib.pixielib.utils.config import cfg as pixie_cfg
 from lib.pixielib.pixie import PIXIE
 import lib.smplx as smplx
+from lib.pymafx.models.smpl import SMPLX as pymaf_smplx
 from lib.pare.pare.core.tester import PARETester
 from lib.pymaf.utils.geometry import rot6d_to_rotmat, batch_rodrigues, rotation_matrix_to_angle_axis
 from lib.pymaf.utils.imutils import process_image
 from lib.common.imutils import econ_process_image
 from lib.pymaf.core import path_config
 from lib.pymaf.models import pymaf_net
+from lib.pymafx.models import pymaf_net as pymafx_net
 from lib.common.config import cfg
 from lib.common.render import Render
 from lib.dataset.body_model import TetraSMPLModel
@@ -51,7 +53,7 @@ class TestDataset():
         self.image_dir = cfg['image_dir']
         self.seg_dir = cfg['seg_dir']
         self.hps_type = cfg['hps_type']
-        self.smpl_type = 'smpl' if cfg['hps_type'] != 'pixie' else 'smplx'
+        self.smpl_type = 'smpl' if cfg['hps_type'] not in ['pixie','pymafx'] else 'smplx'
         self.smpl_gender = 'neutral'
         self.colab = cfg['colab']
 
@@ -86,7 +88,13 @@ class TestDataset():
             self.hps = pymaf_net(path_config.SMPL_MEAN_PARAMS, pretrained=True).to(self.device)
             self.hps.load_state_dict(torch.load(path_config.CHECKPOINT_FILE)['model'], strict=True)
             self.hps.eval()
-
+        elif self.hps_type == 'pymafx':
+            self.hps = pymafx_net(path_config.SMPL_MEAN_PARAMS, pretrained=True).to(self.device)
+            self.hps.load_state_dict(torch.load(path_config.PYMAFX_CHECKPOINT_FILE)['model'], strict=True)
+            self.hps.eval()
+            # get the right SMPLX model
+            # self.smpl_model = pymaf_smplx('/home/adithya/HSL/test/SIFU/data/HPS/pymafx_data/smpl/SMPLX_NEUTRAL_2020.npz').to(self.device)
+            self.smpl_model = smplx.SMPLXLayer('/home/adithya/HSL/test/SIFU/data/HPS/pymafx_data/smpl/SMPLX_NEUTRAL_2020.npz').to(self.device)
         elif self.hps_type == 'pare':
             self.hps = PARETester(path_config.CFG, path_config.CKPT).model
         elif self.hps_type == 'pixie':
@@ -188,7 +196,7 @@ class TestDataset():
                 'mask': img_mask,
                 'uncrop_param': uncrop_param
             }
-
+            
         else:
             img_icon, img_hps, img_ori, img_mask, uncrop_param, segmentations = process_image(
                 img_path,
@@ -206,11 +214,18 @@ class TestDataset():
             }
 
         arr_dict=econ_process_image(img_path,self.hps_type,True,512,self.detector)
+
         data_dict['hands_visibility']=arr_dict['hands_visibility']
 
         with torch.no_grad():
             # import ipdb; ipdb.set_trace()
-            preds_dict = self.hps.forward(img_hps)
+            if self.hps_type == 'pymafx':
+                pymafx_inputs = arr_dict['img_pymafx']
+                for k in pymafx_inputs:
+                    pymafx_inputs[k] = pymafx_inputs[k].to(self.device)
+                preds_dict,_ = self.hps.forward(pymafx_inputs)
+            else:
+                preds_dict = self.hps.forward(img_hps)
 
         data_dict['smpl_faces'] = torch.Tensor(self.faces.astype(np.int64)).long().unsqueeze(0).to(
             self.device)
@@ -223,6 +238,22 @@ class TestDataset():
             data_dict['global_orient'] = output['rotmat'][:, 0:1]
             data_dict['smpl_verts'] = output['verts']     # 不确定尺度是否一样
             data_dict["type"] = "smpl"
+        
+        elif self.hps_type == 'pymafx':
+            # breakpoint()
+            output = preds_dict['smpl_out'][-1]
+            scale, tranX, tranY = output['theta'][0, :3]
+            data_dict['betas'] = output['pred_shape']
+            data_dict['body_pose'] = output['rotmat'][:, 1:][:,:21,:,:]
+            data_dict['global_orient'] = output['rotmat'][:, 0:1]
+            data_dict['smpl_verts'] = output['verts']     # 不确定尺度是否一样
+            data_dict["type"] = "smpl"
+            ## new stuff, delete if it doesn't work
+            data_dict['exp'] = output['pred_exp']
+            data_dict['left_hand_pose'] = output['pred_lhand_rotmat']
+            data_dict['right_hand_pose'] = output['pred_rhand_rotmat']
+            data_dict['jaw_pose'] = output['pred_face_rotmat'][:,:1,:,:]
+            # breakpoint()
 
         elif self.hps_type == 'pare':
             data_dict['body_pose'] = preds_dict['pred_pose'][:, 1:]
@@ -231,6 +262,9 @@ class TestDataset():
             data_dict['smpl_verts'] = preds_dict['smpl_vertices']
             scale, tranX, tranY = preds_dict['pred_cam'][0, :3]
             data_dict["type"] = "smpl"
+
+            
+            
 
         elif self.hps_type == 'pixie':
             data_dict.update(preds_dict)

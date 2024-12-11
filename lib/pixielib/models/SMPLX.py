@@ -695,6 +695,7 @@ class SMPLX(nn.Module):
     def __init__(self, config):
         super(SMPLX, self).__init__()
         # print("creating the SMPLX Decoder")
+        print(config.smplx_model_path)
         ss = np.load(config.smplx_model_path, allow_pickle=True)
         smplx_model = Struct(**ss)
 
