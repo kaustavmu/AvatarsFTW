@@ -19,8 +19,6 @@
         We propose a two-part, inpainting and body fitting pipeline that alleviates 3D human reconstruction issues with human-object interactions, occlusions, and dynamic poses. The inpainting pipeline uses keypoint detection and a novel keypoint estimation technique, uses LaMa for occluding object removal, Stable Diffusion with ControlNets for generation of missing areas, and a GAN inversion step to create a seamless, plausible human reconstruction. The body fitting pipeline uses an improved regressor and adds more losses to the iterative fitting stage to achieve a better human mesh fit in dynamic poses. The figure above demonstrates our work's ability to inpaint human images, generate improved meshes for incomplete images, and fit better human meshes to a variety of highly dynamic poses.</em>
 </div>
 
-:open_book: For more visual results, go checkout our <a href="https://river-zhang.github.io/SIFU-projectpage/" target="_blank">project page</a>
-
 Note: This repository is borrows heavily from the codebase of the original SIFU paper (https://github.com/River-Zhang/SIFU). All credits to them for the overall structure of the codebase and the utility functions we build upon. A lot of the work we've done for this project builds directly on top of this repository. For a list of changes, please refer below.
 
 
@@ -120,42 +118,3 @@ python -m apps.train -cfg ./configs/train/sifu.yaml -test
 # Texture Refinement Module
 
 The code is available for download on [google drive](https://drive.google.com/file/d/1GOpo8enZTWsaWMn_liPnPNmkaUeNsqJk/view?usp=sharing). Please note that the current code structure may not be well-organized and may require some time to set up the environment. The author plans to reorganize it at their earliest convenience.
-
-
-# Applications of SIFU
-
-## Scene Building
-
-![Scene](/docs/images/scene1.gif)
-
-## 3D Printing
-
-![3D](/docs/images/3Dprinting.png)
-
-## Texture Editing
-
-![editing](/docs/images/texture_edit.png)
-
-## Animation
-
-![animation](/docs/images/animation1.gif)
-
-## In-the-wild Reconstruction
-
-![in-the-wild](/docs/images/qualitative_results.png)
-
-
-
-# Bibtex
-If this work is helpful for your research, please consider citing the following BibTeX entry.
-
-```
-@InProceedings{Zhang_2024_CVPR,
-    author    = {Zhang, Zechuan and Yang, Zongxin and Yang, Yi},
-    title     = {SIFU: Side-view Conditioned Implicit Function for Real-world Usable Clothed Human Reconstruction},
-    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-    month     = {June},
-    year      = {2024},
-    pages     = {9936-9947}
-}
-```
