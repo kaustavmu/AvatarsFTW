@@ -31,6 +31,7 @@ Note: This repository is borrows heavily from the codebase of the original SIFU 
 # Changelog 
 - Added distance transform based loss and sobel based loss inspired by [K-Body](https://arxiv.org/pdf/2304.11542)
 - Integrated the **updated** version of [PyMAF-X](https://github.com/HongwenZhang/PyMAF-X) into the repository.
+- Added inpainting pipeline to remove objects and occlusions.
 
 # Installation
 - Ubuntu 20 / 18
@@ -98,6 +99,10 @@ Optionally, we have also debugged a few things to allow for PyMAF to run smoothl
 python -m apps.infer -cfg ./configs/sifu.yaml -gpu 0 -in_dir ./examples -out_dir ./results -loop_smpl 100 -loop_cloth 200 -hps_type pymafx
 
 ```
+# Inpainting
+
+To install and run the inpainting pipeline, refer to the README file in the Inpainting folder and follow those instructions.
+ 
 # Testing
 
 ```bash
