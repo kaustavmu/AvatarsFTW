@@ -14,8 +14,9 @@
 
 
 <div style="width: 80%; text-align: center; margin:auto;">
-    <img style="width:100%" src="docs/images/teaser.png">
-    <em>Figure 1. With just a single image, SIFU is capable of reconstructing a high-quality 3D clothed human model, making it well-suited for practical applications such as 3D printing and scene creation. At the heart of SIFU is a novel Side-view Conditioned Implicit Function, which is key to enhancing feature extraction and geometric precision. Furthermore, SIFU introduces a 3D Consistent Texture Refinement process, greatly improving texture quality and facilitating texture editing with the help of text-to-image diffusion models. Notably proficient in dealing with complex poses and loose clothing, SIFU stands out as an ideal solution for real-world applications.</em>
+    <img style="width:100%" src="docs/images/teaser.jpg">
+    <em>Figure 1. 
+        We propose a two-part, inpainting and body fitting pipeline that alleviates 3D human reconstruction issues with human-object interactions, occlusions, and dynamic poses. The inpainting pipeline uses keypoint detection and a novel keypoint estimation technique, uses LaMa for occluding object removal, Stable Diffusion with ControlNets for generation of missing areas, and a GAN inversion step to create a seamless, plausible human reconstruction. The body fitting pipeline uses an improved regressor and adds more losses to the iterative fitting stage to achieve a better human mesh fit in dynamic poses. The figure above demonstrates our work's ability to inpaint human images, generate improved meshes for incomplete images, and fit better human meshes to a variety of highly dynamic poses.</em>
 </div>
 
 :open_book: For more visual results, go checkout our <a href="https://river-zhang.github.io/SIFU-projectpage/" target="_blank">project page</a>
