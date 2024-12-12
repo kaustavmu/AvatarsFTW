@@ -9,7 +9,7 @@
 </div>
 
 <div>
-    <a href="https://river-zhang.github.io/SIFU-projectpage/" target="_blank">16-824: Visual Learning And Recognition Project </a>
+    <a href="https://visual-learning.cs.cmu.edu/" target="_blank">16-824: Visual Learning And Recognition Project </a>
 </div>
 
 
