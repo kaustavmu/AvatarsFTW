@@ -1,31 +1,25 @@
 <div align="center">
 
-<h1>SIFU: Side-view Conditioned Implicit Function for Real-world Usable Clothed Human Reconstruction</h1>
+<h1>AvatarsFTW: 3D Human Avatars From The Wild</h1>
 
 <div>
-    <a href="https://river-zhang.github.io/zechuanzhang//" target="_blank">Zechuan Zhang</a>&emsp;
-    <a href="https://z-x-yang.github.io/" target="_blank">Zongxin Yang✉</a>&emsp;
-    <a href="https://scholar.google.com/citations?user=RMSuNFwAAAAJ&hl=zh-CN&oi=ao" target="_blank">Yi Yang</a>&emsp;
+    <a href="https://adithyaknarayan.github.io/" target="_blank">Adithya Narayan</a>&emsp;
+    <a href="http://www.kaustavmukherjee.com/" target="_blank">Kaustav Mukherjee</a>&emsp;
+    <a href="" target="_blank">Shaurye Agarwal</a>&emsp;
 </div>
+
 <div>
-    ReLER, CCAI, Zhejiang University
-</div>
-<div>
-     <sup>✉</sup>Corresponding Author
-</div>
-<div>
-    <a href="https://river-zhang.github.io/SIFU-projectpage/" target="_blank">CVPR 2024 Highlight</a>
+    <a href="https://visual-learning.cs.cmu.edu/" target="_blank">16-824: Visual Learning And Recognition Project </a>
 </div>
 
 
 <div style="width: 80%; text-align: center; margin:auto;">
-    <img style="width:100%" src="docs/images/teaser.png">
-    <em>Figure 1. With just a single image, SIFU is capable of reconstructing a high-quality 3D clothed human model, making it well-suited for practical applications such as 3D printing and scene creation. At the heart of SIFU is a novel Side-view Conditioned Implicit Function, which is key to enhancing feature extraction and geometric precision. Furthermore, SIFU introduces a 3D Consistent Texture Refinement process, greatly improving texture quality and facilitating texture editing with the help of text-to-image diffusion models. Notably proficient in dealing with complex poses and loose clothing, SIFU stands out as an ideal solution for real-world applications.</em>
+    <img style="width:100%" src="docs/images/teaser.jpg">
+    <em>Figure 1. 
+        We propose a two-part, inpainting and body fitting pipeline that alleviates 3D human reconstruction issues with human-object interactions, occlusions, and dynamic poses. The inpainting pipeline uses keypoint detection and a novel keypoint estimation technique, uses LaMa for occluding object removal, Stable Diffusion with ControlNets for generation of missing areas, and a GAN inversion step to create a seamless, plausible human reconstruction. The body fitting pipeline uses an improved regressor and adds more losses to the iterative fitting stage to achieve a better human mesh fit in dynamic poses. The figure above demonstrates our work's ability to inpaint human images, generate improved meshes for incomplete images, and fit better human meshes to a variety of highly dynamic poses.</em>
 </div>
 
-:open_book: For more visual results, go checkout our <a href="https://river-zhang.github.io/SIFU-projectpage/" target="_blank">project page</a>
-
-This repository will contain the official implementation of _SIFU_.
+Note: This repository is borrows heavily from the codebase of the original SIFU paper (https://github.com/River-Zhang/SIFU). All credits to them for the overall structure of the codebase and the utility functions we build upon. A lot of the work we've done for this project builds directly on top of this repository. For a list of changes, please refer below.
 
 
 
@@ -33,13 +27,10 @@ This repository will contain the official implementation of _SIFU_.
 
 
 
-# News 
-- **[2024/6/18]** Due to visa check problem, the author can not come to the conference center in person. We are sorry about this [sad][cry].
-- **[2024/4/5]** Our paper has been accepted as **Highlight** (Top 11.9% of accepted papers)!
-- **[2024/2/28]** We release the code of **geometry reconstruction**, including test and inference.
-- **[2024/2/27]** SIFU has been accepted by **CVPR 2024**! See you in Seattle!
-- **[2023/12/13]** We release the paper on [arXiv](https://arxiv.org/abs/2312.06704).
-- **[2023/12/10]** We build the [Project Page](https://river-zhang.github.io/SIFU-projectpage/).
+# Changelog 
+- Added distance transform based loss and sobel based loss inspired by [K-Body](https://arxiv.org/pdf/2304.11542)
+- Integrated the **updated** version of [PyMAF-X](https://github.com/HongwenZhang/PyMAF-X) into the repository.
+- Added inpainting pipeline to remove objects and occlusions.
 
 # Installation
 - Ubuntu 20 / 18
@@ -82,10 +73,10 @@ Please download the [checkpoint (google drive)](https://drive.google.com/file/d/
 
 Please follow [ICON](https://github.com/YuliangXiu/ICON/blob/master/docs/installation.md) to download the extra data, such as HPS and SMPL (using ```fetch_hps.sh``` and ```fetch_data.sh```). There may be missing files about SMPL, and you can download from [here](https://huggingface.co/lilpotat/pytorch3d/tree/main/smpl_data) and put them in /data/smpl_related/smpl_data/.
 
-
+Additonally, please follow the instuctions on PyMAF-X and setup the data directory in `test/SIFU/data/HPS/pymafx_data`.
 # Inference
 
-
+To test the pipeline on the original baseline mentioned in the SIFU paper, please run the following.
 ```bash
 
 
@@ -93,6 +84,24 @@ python -m apps.infer -cfg ./configs/sifu.yaml -gpu 0 -in_dir ./examples -out_dir
 
 ```
 
+To run our updated model, please run the following.
+```bash
+
+
+python -m apps.infer -cfg ./configs/sifu.yaml -gpu 0 -in_dir ./examples -out_dir ./results -loop_smpl 100 -loop_cloth 200 -hps_type pymafx
+
+```
+Optionally, we have also debugged a few things to allow for PyMAF to run smoothly. Note that this is a slightly older version as implmented in the original SIFU repository.
+```bash
+
+
+python -m apps.infer -cfg ./configs/sifu.yaml -gpu 0 -in_dir ./examples -out_dir ./results -loop_smpl 100 -loop_cloth 200 -hps_type pymafx
+
+```
+# Inpainting
+
+To install and run the inpainting pipeline, refer to the README file in the Inpainting folder and follow those instructions.
+ 
 # Testing
 
 ```bash
@@ -109,42 +118,3 @@ python -m apps.train -cfg ./configs/train/sifu.yaml -test
 # Texture Refinement Module
 
 The code is available for download on [google drive](https://drive.google.com/file/d/1GOpo8enZTWsaWMn_liPnPNmkaUeNsqJk/view?usp=sharing). Please note that the current code structure may not be well-organized and may require some time to set up the environment. The author plans to reorganize it at their earliest convenience.
-
-
-# Applications of SIFU
-
-## Scene Building
-
-![Scene](/docs/images/scene1.gif)
-
-## 3D Printing
-
-![3D](/docs/images/3Dprinting.png)
-
-## Texture Editing
-
-![editing](/docs/images/texture_edit.png)
-
-## Animation
-
-![animation](/docs/images/animation1.gif)
-
-## In-the-wild Reconstruction
-
-![in-the-wild](/docs/images/qualitative_results.png)
-
-
-
-# Bibtex
-If this work is helpful for your research, please consider citing the following BibTeX entry.
-
-```
-@InProceedings{Zhang_2024_CVPR,
-    author    = {Zhang, Zechuan and Yang, Zongxin and Yang, Yi},
-    title     = {SIFU: Side-view Conditioned Implicit Function for Real-world Usable Clothed Human Reconstruction},
-    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-    month     = {June},
-    year      = {2024},
-    pages     = {9936-9947}
-}
-```
