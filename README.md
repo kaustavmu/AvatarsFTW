@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>Run Time Optimization of SMPLX for Avatar Generation</h1>
+<h1>AvatarsFTW: 3D Human Avatars From The Wild</h1>
 
 <div>
     <a href="https://adithyaknarayan.github.io/" target="_blank">Adithya Narayan</a>&emsp;
