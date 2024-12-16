@@ -12,14 +12,20 @@
     <a href="https://visual-learning.cs.cmu.edu/" target="_blank">16-824: Visual Learning And Recognition Project </a>
 </div>
 
+<br>
+
+<div>
+    <a href="https://www.kaustavmukherjee.com/AvatarsFTWPage/" target="_blank"> Project Page </a>
+</div>
+
 
 <div style="width: 80%; text-align: center; margin:auto;">
-    <img style="width:100%" src="docs/images/teaser.jpg">
+    <img style="width:100%" src="docs/images/AvatarsFTW Overview.jpg">
     <em>Figure 1. 
         We propose a two-part, inpainting and body fitting pipeline that alleviates 3D human reconstruction issues with human-object interactions, occlusions, and dynamic poses. The inpainting pipeline uses keypoint detection and a novel keypoint estimation technique, uses LaMa for occluding object removal, Stable Diffusion with ControlNets for generation of missing areas, and a GAN inversion step to create a seamless, plausible human reconstruction. The body fitting pipeline uses an improved regressor and adds more losses to the iterative fitting stage to achieve a better human mesh fit in dynamic poses. The figure above demonstrates our work's ability to inpaint human images, generate improved meshes for incomplete images, and fit better human meshes to a variety of highly dynamic poses.</em>
 </div>
 
-Note: This repository is borrows heavily from the codebase of the original SIFU paper (https://github.com/River-Zhang/SIFU). All credits to them for the overall structure of the codebase and the utility functions we build upon. A lot of the work we've done for this project builds directly on top of this repository. For a list of changes, please refer below.
+<br> Note: This repository is borrows heavily from the codebase of the original SIFU paper (https://github.com/River-Zhang/SIFU). All credits to them for the overall structure of the codebase and the utility functions we build upon. A lot of the work we've done for this project builds directly on top of this repository. For a list of changes, please refer below.
 
 
 
